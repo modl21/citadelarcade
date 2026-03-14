@@ -406,7 +406,7 @@ export default function Index() {
           <div className="space-y-6">
             <div className="h-[2px] w-12 bg-white/20" />
             <h1 className="max-w-4xl text-6xl font-black leading-[0.95] tracking-tighter text-white sm:text-7xl lg:text-8xl">
-              COMPETITIVE FUN <span className="text-white/40 italic font-medium text-5xl sm:text-6xl lg:text-7xl">WEEKLY</span> <span className="text-white/40 italic font-medium">GAMES</span>
+              COMPETITIVE FUN <span className="italic font-medium text-5xl sm:text-6xl lg:text-7xl">WEEKLY</span> <span className="text-white/40 italic font-medium">GAMES</span>
             </h1>
             <p className="max-w-2xl text-lg font-medium leading-relaxed text-white/50">
               Citadel Arcade is the headquarters of the Citadel Gaming Universe.
