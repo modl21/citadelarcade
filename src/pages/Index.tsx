@@ -313,13 +313,12 @@ export default function Index() {
              <Dialog open={isDonateOpen} onOpenChange={setIsDonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
-                    CONTRIBUTE
+                    DONATE
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="border-white/[0.06] bg-[#0a0a0a] text-white sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-black uppercase tracking-tight">SUPPORT CITADEL ARCADE</DialogTitle>
-                    <DialogDescription className="text-sm font-medium text-white/40 uppercase tracking-widest">Inserted to {LIGHTNING_ADDRESS}</DialogDescription>
                   </DialogHeader>
 
                   {!invoice ? (
@@ -336,19 +335,32 @@ export default function Index() {
                            </Button>
                         ))}
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">CUSTOM SATS</Label>
-                        <Input 
-                          placeholder="ENTER AMOUNT" 
-                          value={customAmount} 
-                          onChange={(e) => setCustomAmount(e.target.value)}
-                          className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white"
-                        />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">CUSTOM SATS</Label>
+                          <Input 
+                            placeholder="ENTER AMOUNT" 
+                            type="number"
+                            value={customAmount} 
+                            onChange={(e) => setCustomAmount(e.target.value)}
+                            className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">MEMO (OPTIONAL)</Label>
+                          <Textarea 
+                            placeholder="LEAVE A MESSAGE" 
+                            value={memo} 
+                            onChange={(e) => setMemo(e.target.value)}
+                            className="resize-none border-white/5 bg-white/5 text-sm text-white"
+                            rows={3}
+                          />
+                        </div>
                       </div>
                       <Button 
                         onClick={handleGenerateInvoice} 
                         disabled={isGeneratingInvoice}
-                        className="w-full bg-white font-black text-black"
+                        className="w-full bg-white font-black text-black hover:bg-neutral-200"
                       >
                         {isGeneratingInvoice ? <Loader2 className="animate-spin" /> : "GENERATE INVOICE"}
                       </Button>
