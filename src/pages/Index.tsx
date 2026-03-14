@@ -444,7 +444,7 @@ export default function Index() {
             <h4 className="text-sm font-black uppercase tracking-widest text-white">Weekly Resilience</h4>
             <p className="text-sm leading-relaxed text-white/40">
               The battlefield resets every Monday UTC. Archives of previous champions serve as the 
-              permanent historical record of the Citadel wasteland.
+              permanent historical record of the Citadel Universe.
             </p>
           </div>
         </section>

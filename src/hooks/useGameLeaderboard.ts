@@ -12,7 +12,7 @@ export const GAME_CONFIG = {
     kind: 1447,
     tag: 'sats-invaders',
     title: 'Sats Invaders',
-    subtitle: '100 Sats. One Life. Weekly Leaderboard.',
+    subtitle: 'One Life. Infinite aliens.',
     playUrl: 'https://satsinvaders.com',
     color: 'green' as const,
   },
