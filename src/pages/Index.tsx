@@ -426,12 +426,12 @@ export default function Index() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">NETWORK</p>
               <p className="flex items-center gap-1.5 text-[13px] font-black text-white/90 uppercase">
                 <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                Nostr Mainnet
+                Nostr
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">CURRENCY</p>
-              <p className="text-[13px] font-black text-white/90 uppercase">Lightning Sats</p>
+              <p className="text-[13px] font-black text-white/90 uppercase">Bitcoin</p>
             </div>
           </div>
         </header>
