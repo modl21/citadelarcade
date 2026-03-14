@@ -15,6 +15,7 @@ export const GAME_CONFIG = {
     title: 'Sats Invaders',
     subtitle: 'One Life. Infinite aliens.',
     playUrl: 'https://satsinvaders.com',
+    imageUrl: 'https://blossom.ditto.pub/fd06b60dd00a90285a77eda43e7c738a9baf93639f64179eff8f95282efd463a.jpeg',
     color: 'green' as const,
   },
   'citadel-run': {
@@ -23,6 +24,7 @@ export const GAME_CONFIG = {
     title: 'Citadel Run',
     subtitle: 'One life. Infinite wasteland.',
     playUrl: 'https://citadelrun.com',
+    imageUrl: 'https://citadelrun.com/citadelruns.jpg',
     color: 'amber' as const,
   },
 } as const;

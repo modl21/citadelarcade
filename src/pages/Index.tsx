@@ -83,6 +83,22 @@ function GameCard({ gameId }: { gameId: GameId }) {
 
   return (
     <Card className={`group overflow-hidden border-white/[0.06] bg-black/40 backdrop-blur-xl transition-all hover:border-white/[0.12] ${accentGlow}`}>
+      {/* Game Preview Image */}
+      <div className="relative aspect-[16/9] w-full overflow-hidden border-b border-white/[0.04]">
+        <img 
+          src={config.imageUrl} 
+          alt={config.title}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        
+        <div className="absolute bottom-4 left-6">
+          <Badge variant="outline" className={`border-emerald-500/20 bg-black/60 text-[10px] font-black uppercase tracking-widest backdrop-blur-md ${colorClasses}`}>
+            ACTIVE MODULE
+          </Badge>
+        </div>
+      </div>
+
       <CardHeader className="space-y-4 border-b border-white/[0.04] p-6 pb-8">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="space-y-1.5 font-sans">
