@@ -303,9 +303,9 @@ export default function Index() {
         <nav className="mb-24 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 items-center justify-center rounded-sm bg-white px-3">
-                <span className="text-[13px] font-black tracking-tighter text-black uppercase">CITADEL</span>
-              </div>
+            <div className="flex h-10 items-center justify-center rounded-sm bg-white px-3">
+              <span className="text-[13px] font-black tracking-tighter text-black uppercase">CITADEL ARCADE</span>
+            </div>
               <Badge variant="outline" className="hidden border-white/10 bg-transparent text-[10px] font-black uppercase tracking-[0.2em] text-white/40 sm:flex">
                 V0.1 ARCHIVE
               </Badge>
@@ -483,7 +483,7 @@ export default function Index() {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-6 items-center justify-center rounded-[1px] bg-white px-2">
-                  <span className="text-[9px] font-black tracking-tighter text-black uppercase">CITADEL WIRE</span>
+                  <span className="text-[9px] font-black tracking-tighter text-black uppercase">CITADEL ARCADE</span>
                 </div>
                 <span className="text-[11px] font-medium text-white/20 uppercase tracking-[0.2em] italic">System Network</span>
               </div>
