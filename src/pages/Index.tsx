@@ -409,8 +409,8 @@ export default function Index() {
               COMPETITIVE HIGH SIGNAL <span className="text-white/40 italic font-medium">ARCADE</span>
             </h1>
             <p className="max-w-2xl text-lg font-medium leading-relaxed text-white/50">
-              Citadel Arcade is the centralized hub for the Citadel game universe. 
-              Real-time analytics, permachain leaderboards, and week-over-week cycle dominance.
+              Citadel Arcade is the headquarters of the Citadel Gaming Universe. 
+              Real-time analytics, leaderboards, and weekly cycle dominance.
             </p>
           </div>
 
