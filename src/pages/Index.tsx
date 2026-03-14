@@ -348,13 +348,8 @@ export default function Index() {
         {/* Navigation / Header Area */}
         <nav className="mb-24 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4">
             <div className="flex h-10 items-center justify-center rounded-sm bg-white px-3">
               <span className="text-[13px] font-black tracking-tighter text-black uppercase">CITADEL ARCADE</span>
-            </div>
-            <Badge variant="outline" className="hidden border-white/10 bg-transparent text-[10px] font-black uppercase tracking-[0.2em] text-white/40 sm:flex">
-              V0.1
-            </Badge>
             </div>
             
             <a 
