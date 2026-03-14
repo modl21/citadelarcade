@@ -91,12 +91,6 @@ function GameCard({ gameId }: { gameId: GameId }) {
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        
-        <div className="absolute bottom-4 left-6">
-          <Badge variant="outline" className={`border-emerald-500/20 bg-black/60 text-[10px] font-black uppercase tracking-widest backdrop-blur-md ${colorClasses}`}>
-            ACTIVE MODULE
-          </Badge>
-        </div>
       </div>
 
       <CardHeader className="space-y-4 border-b border-white/[0.04] p-6 pb-8">
