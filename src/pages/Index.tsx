@@ -508,7 +508,7 @@ export default function Index() {
             <h4 className="text-sm font-black uppercase tracking-widest text-white">Instant Settlement</h4>
             <p className="text-sm leading-relaxed text-white/40">
               Lightning Network integration ensures global, near-zero fee entry from any compatible wallet. 
-              Play instantly from anywhere in the world.
+              Play instantly from anywhere in the world. Bitcoin is the best money. There is no second best.
             </p>
           </div>
           <div className="space-y-4">
@@ -517,8 +517,8 @@ export default function Index() {
             </div>
             <h4 className="text-sm font-black uppercase tracking-widest text-white">Weekly Resilience</h4>
             <p className="text-sm leading-relaxed text-white/40">
-              The battlefield resets every Monday UTC. Archives of previous champions serve as the 
-              permanent historical record of the Citadel Universe.
+              The battlefield resets every Monday UTC. Nostr serves as the 
+              historical record of the Citadel Universe.
             </p>
           </div>
         </section>
