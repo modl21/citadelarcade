@@ -38,6 +38,7 @@ import {
   useCurrentLeaderboard, 
   usePreviousChampion, 
   useTotalRunCount, 
+  useNip05Npub,
   getTimeUntilReset,
   getWeekBounds,
   GAME_CONFIG,
