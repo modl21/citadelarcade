@@ -138,22 +138,7 @@ function GameCard({ gameId }: { gameId: GameId }) {
               ))
             ) : leaderboard && leaderboard.length > 0 ? (
               leaderboard.slice(0, 5).map((entry, i) => (
-                <div 
-                  key={entry.eventId}
-                  className={`flex h-11 items-center justify-between rounded-lg border px-3 transition-colors ${
-                    i === 0 
-                      ? 'border-amber-500/20 bg-amber-500/5 text-amber-200' 
-                      : 'border-transparent bg-white/[0.03] text-white/70 hover:bg-white/[0.05]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <span className="shrink-0 font-mono text-[10px] font-bold text-white/20">0{i + 1}</span>
-                    <span className="truncate text-sm font-semibold tracking-tight">{entry.lightning}</span>
-                  </div>
-                  <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums">
-                    {entry.score.toLocaleString()}
-                  </span>
-                </div>
+                <LeaderboardRow key={entry.eventId} entry={entry} rank={i} />
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -176,9 +161,7 @@ function GameCard({ gameId }: { gameId: GameId }) {
                 <Crown className="size-20" />
               </div>
               <div className="space-y-1">
-                <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
-                  {champion.lightning}
-                </p>
+                <ChampionName lightning={champion.lightning} />
                 <p className="font-mono text-sm font-bold text-amber-500/80">
                   {champion.score.toLocaleString()} SATS
                 </p>
@@ -202,6 +185,68 @@ function GameCard({ gameId }: { gameId: GameId }) {
         </section>
       </CardContent>
     </Card>
+  );
+}
+
+function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
+  const { data: npub } = useNip05Npub(entry.lightning);
+
+  const content = (
+    <div 
+      className={`flex h-11 items-center justify-between rounded-lg border px-3 transition-colors ${
+        rank === 0 
+          ? 'border-amber-500/20 bg-amber-500/5 text-amber-200' 
+          : 'border-transparent bg-white/[0.03] text-white/70 hover:bg-white/[0.05]'
+      }`}
+    >
+      <div className="flex items-center gap-3 overflow-hidden">
+        <span className="shrink-0 font-mono text-[10px] font-bold text-white/20">0{rank + 1}</span>
+        <span className="truncate text-sm font-semibold tracking-tight">{entry.lightning}</span>
+      </div>
+      <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums">
+        {entry.score.toLocaleString()}
+      </span>
+    </div>
+  );
+
+  if (npub) {
+    return (
+      <a 
+        href={`https://primal.net/p/${npub}`} 
+        target="_blank" 
+        rel="noreferrer noopener"
+        className="block"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return content;
+}
+
+function ChampionName({ lightning }: { lightning: string }) {
+  const { data: npub } = useNip05Npub(lightning);
+
+  if (npub) {
+    return (
+      <a 
+        href={`https://primal.net/p/${npub}`} 
+        target="_blank" 
+        rel="noreferrer noopener"
+        className="block hover:underline underline-offset-4 decoration-white/20"
+      >
+        <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
+          {lightning}
+        </p>
+      </a>
+    );
+  }
+
+  return (
+    <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
+      {lightning}
+    </p>
   );
 }
 

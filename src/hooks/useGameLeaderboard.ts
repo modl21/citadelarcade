@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
 import type { NostrEvent } from '@nostrify/nostrify';
+import { nip19 } from 'nostr-tools';
 
 // ─── Game configuration ────────────────────────────────────────────────────────
 // These kind numbers and tags are sourced directly from the game bundles:
@@ -192,5 +193,34 @@ export function useTotalRunCount(gameId: GameId) {
     },
     refetchInterval: 30_000,
     staleTime: 15_000,
+  });
+}
+
+// ─── NIP-05 Lookup ────────────────────────────────────────────────────────────
+
+async function lookupNip05(lightning: string): Promise<string | null> {
+  const [name, domain] = lightning.split('@');
+  if (!name || !domain) return null;
+
+  try {
+    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const pubkey = data.names?.[name];
+    if (pubkey && /^[0-9a-f]{64}$/.test(pubkey)) {
+      return nip19.npubEncode(pubkey);
+    }
+  } catch {
+    // Fail silently
+  }
+  return null;
+}
+
+export function useNip05Npub(lightning: string) {
+  return useQuery({
+    queryKey: ['nip05', lightning],
+    queryFn: () => lookupNip05(lightning),
+    staleTime: 60 * 60_000, // 1 hour
+    gcTime: 24 * 60 * 60_000, // 24 hours
   });
 }
