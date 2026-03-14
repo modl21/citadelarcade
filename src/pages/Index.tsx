@@ -301,15 +301,33 @@ export default function Index() {
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-12">
         {/* Navigation / Header Area */}
         <nav className="mb-24 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 items-center justify-center rounded-sm bg-white px-3">
-              <span className="text-[13px] font-black tracking-tighter text-black uppercase">CITADEL</span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 items-center justify-center rounded-sm bg-white px-3">
+                <span className="text-[13px] font-black tracking-tighter text-black uppercase">CITADEL</span>
+              </div>
+              <Badge variant="outline" className="hidden border-white/10 bg-transparent text-[10px] font-black uppercase tracking-[0.2em] text-white/40 sm:flex">
+                V0.1 ARCHIVE
+              </Badge>
             </div>
-            <Badge variant="outline" className="hidden border-white/10 bg-transparent text-[10px] font-black uppercase tracking-[0.2em] text-white/40 sm:flex">
-              V0.1 ARCHIVE
-            </Badge>
+            
+            <a 
+              href="https://primal.net/odell" 
+              target="_blank" 
+              rel="noreferrer noopener"
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 hover:text-white transition-colors"
+            >
+              CURATED BY <span className="text-white/40 group-hover:text-white">ODELL</span>
+            </a>
           </div>
+
           <div className="flex items-center gap-4">
+             <Button variant="ghost" asChild className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
+                <a href="https://citadelwire.com" target="_blank" rel="noreferrer noopener">
+                  NEWS
+                </a>
+             </Button>
+
              <Dialog open={isDonateOpen} onOpenChange={setIsDonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
@@ -380,7 +398,6 @@ export default function Index() {
                   )}
                 </DialogContent>
              </Dialog>
-             <LoginArea className="bg-transparent" />
           </div>
         </nav>
 
