@@ -407,7 +407,10 @@ export default function Index() {
                              key={p} 
                              variant={selectedPreset === p && !customAmount ? "default" : "outline"}
                              onClick={() => { setSelectedPreset(p); setCustomAmount(""); }}
-                             className="h-9 border-white/5 bg-white/5 text-[10px] font-black hover:bg-white/10"
+                             className={selectedPreset === p && !customAmount
+                               ? "h-9 bg-white text-black text-[10px] font-black hover:bg-neutral-200 border-white"
+                               : "h-9 border-white/5 bg-white/5 text-[10px] font-black hover:bg-white/10"
+                             }
                            >
                              {p/1000}K
                            </Button>
