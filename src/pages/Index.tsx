@@ -296,7 +296,14 @@ export default function Index() {
 
   useSeoMeta({
     title: 'Citadel Arcade | High Performance Gaming',
-    description: 'The home for Citadel Universe competitive gaming. Real-time Nostr-powered leaderboards and run tracking.',
+    description: 'Simple. Fun. Ad Free. Games.',
+    ogTitle: 'Citadel Arcade',
+    ogDescription: 'Simple. Fun. Ad Free. Games.',
+    ogImage: 'https://blossom.ditto.pub/48758fa1ea6f761f322d506818953b4506d9caf3b4dbb2afe04a7891101b1140.jpeg',
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'Citadel Arcade',
+    twitterDescription: 'Simple. Fun. Ad Free. Games.',
+    twitterImage: 'https://blossom.ditto.pub/48758fa1ea6f761f322d506818953b4506d9caf3b4dbb2afe04a7891101b1140.jpeg',
   });
 
   useEffect(() => {
