@@ -295,14 +295,14 @@ export default function Index() {
   }, [weekStart, weekEnd]);
 
   useSeoMeta({
-    title: 'Citadel Arcade | High Performance Gaming',
-    description: 'Simple. Fun. Ad Free. Games.',
+    title: 'Citadel Arcade',
+    description: 'a fortress for gamers',
     ogTitle: 'Citadel Arcade',
-    ogDescription: 'Simple. Fun. Ad Free. Games.',
+    ogDescription: 'a fortress for gamers',
     ogImage: 'https://blossom.ditto.pub/48758fa1ea6f761f322d506818953b4506d9caf3b4dbb2afe04a7891101b1140.jpeg',
     twitterCard: 'summary_large_image',
     twitterTitle: 'Citadel Arcade',
-    twitterDescription: 'Simple. Fun. Ad Free. Games.',
+    twitterDescription: 'a fortress for gamers',
     twitterImage: 'https://blossom.ditto.pub/48758fa1ea6f761f322d506818953b4506d9caf3b4dbb2afe04a7891101b1140.jpeg',
   });
 
