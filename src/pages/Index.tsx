@@ -74,11 +74,13 @@ function GameCard({ gameId }: { gameId: GameId }) {
   const colorClasses = {
     green: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400',
     amber: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
+    blue: 'border-blue-500/20 bg-blue-500/10 text-blue-400',
   }[config.color];
 
   const accentGlow = {
     green: 'shadow-[0_0_40px_-15px_rgba(16,185,129,0.3)]',
     amber: 'shadow-[0_0_40px_-15px_rgba(245,158,11,0.3)]',
+    blue: 'shadow-[0_0_40px_-15px_rgba(59,130,246,0.3)]',
   }[config.color];
 
   return (
@@ -496,8 +498,10 @@ export default function Index() {
 
         {/* Games Grid */}
         <main className="mb-40 grid gap-8 lg:grid-cols-2">
-          {(Object.keys(GAME_CONFIG) as GameId[]).map((id) => (
-            <GameCard key={id} gameId={id} />
+          {(Object.keys(GAME_CONFIG) as GameId[]).map((id, index, arr) => (
+            <div key={id} className={arr.length % 2 !== 0 && index === arr.length - 1 ? 'lg:col-span-2 lg:max-w-[calc(50%-1rem)] lg:mx-auto' : ''}>
+              <GameCard gameId={id} />
+            </div>
           ))}
         </main>
 
@@ -557,6 +561,7 @@ export default function Index() {
                 <ul className="space-y-2 text-white/50">
                   <li><a href="https://satsinvaders.com" className="hover:text-white">SATS INVADERS</a></li>
                   <li><a href="https://citadelrun.com" className="hover:text-white">CITADEL RUN</a></li>
+                  <li><a href="https://citadelwar.com" className="hover:text-white">CITADEL WAR</a></li>
                 </ul>
               </div>
               <div className="space-y-4">

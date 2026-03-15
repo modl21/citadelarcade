@@ -7,6 +7,7 @@ import { nip19 } from 'nostr-tools';
 // These kind numbers and tags are sourced directly from the game bundles:
 //   satsinvaders.com  → kind 1447, t-tag "sats-invaders"
 //   citadelrun.com    → kind 1448, t-tag "citadel-run"
+//   citadelwar.com    → kind 1448, t-tag "citadel-war"
 
 export const GAME_CONFIG = {
   'sats-invaders': {
@@ -26,6 +27,15 @@ export const GAME_CONFIG = {
     playUrl: 'https://citadelrun.com',
     imageUrl: 'https://citadelrun.com/citadelruns.jpg',
     color: 'amber' as const,
+  },
+  'citadel-war': {
+    kind: 1448,
+    tag: 'citadel-war',
+    title: 'Citadel War',
+    subtitle: 'Protect the Citadel.',
+    playUrl: 'https://citadelwar.com',
+    imageUrl: 'https://blossom.ditto.pub/73791a4a53fef178065a2277ee9507637f5fa40c9adbef0426222387aab57452.jpeg',
+    color: 'blue' as const,
   },
 } as const;
 
