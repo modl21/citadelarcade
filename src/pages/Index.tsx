@@ -559,9 +559,9 @@ export default function Index() {
               <div className="space-y-4">
                 <span className="text-white/20">GAMES</span>
                 <ul className="space-y-2 text-white/50">
-                  <li><a href="https://satsinvaders.com" className="hover:text-white">SATS INVADERS</a></li>
                   <li><a href="https://citadelrun.com" className="hover:text-white">CITADEL RUN</a></li>
                   <li><a href="https://citadelwar.com" className="hover:text-white">CITADEL WAR</a></li>
+                  <li><a href="https://satsinvaders.com" className="hover:text-white">SATS INVADERS</a></li>
                 </ul>
               </div>
               <div className="space-y-4">

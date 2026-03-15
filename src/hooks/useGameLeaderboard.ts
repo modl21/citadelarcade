@@ -10,15 +10,6 @@ import { nip19 } from 'nostr-tools';
 //   citadelwar.com    → kind 1448, t-tag "citadel-war"
 
 export const GAME_CONFIG = {
-  'sats-invaders': {
-    kind: 1447,
-    tag: 'sats-invaders',
-    title: 'Sats Invaders',
-    subtitle: 'One Life. Infinite aliens.',
-    playUrl: 'https://satsinvaders.com',
-    imageUrl: 'https://blossom.ditto.pub/fd06b60dd00a90285a77eda43e7c738a9baf93639f64179eff8f95282efd463a.jpeg',
-    color: 'green' as const,
-  },
   'citadel-run': {
     kind: 1448,
     tag: 'citadel-run',
@@ -36,6 +27,15 @@ export const GAME_CONFIG = {
     playUrl: 'https://citadelwar.com',
     imageUrl: 'https://blossom.ditto.pub/73791a4a53fef178065a2277ee9507637f5fa40c9adbef0426222387aab57452.jpeg',
     color: 'blue' as const,
+  },
+  'sats-invaders': {
+    kind: 1447,
+    tag: 'sats-invaders',
+    title: 'Sats Invaders',
+    subtitle: 'One Life. Infinite aliens.',
+    playUrl: 'https://satsinvaders.com',
+    imageUrl: 'https://blossom.ditto.pub/fd06b60dd00a90285a77eda43e7c738a9baf93639f64179eff8f95282efd463a.jpeg',
+    color: 'green' as const,
   },
 } as const;
 
