@@ -1,21 +1,16 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSeoMeta } from '@unhead/react';
 import {
-  Gamepad2,
   Trophy,
   ArrowUpRight,
   Shield,
   TimerReset,
   Crown,
-  HeartHandshake,
   Loader2,
-  Check,
   Zap,
-  Twitter,
-  ExternalLink,
+  Eye,
 } from 'lucide-react';
 
-import { LoginArea } from '@/components/auth/LoginArea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -33,15 +27,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from '@/hooks/useTheme';
-import { useToast } from '@/hooks/useToast';
 import { 
   useCurrentLeaderboard, 
   usePreviousChampion, 
   useTotalRunCount, 
   useNip05Npub,
+  usePageViewCount,
   getTimeUntilReset,
   getWeekBounds,
   GAME_CONFIG,
+  HOME_PAGE_VIEW_ID,
   type GameId,
   type LeaderboardEntry
 } from '@/hooks/useGameLeaderboard';
@@ -54,10 +49,6 @@ const DONATION_PRESETS = [1000, 5000, 10000, 21000, 42000];
 // ─── Formatting ─────────────────────────────────────────────────────────────
 
 const SATS_FORMATTER = new Intl.NumberFormat('en-US');
-
-function formatSats(value: number): string {
-  return `${SATS_FORMATTER.format(value)} sats`;
-}
 
 function formatNumber(value: number): string {
   return SATS_FORMATTER.format(value);
@@ -269,7 +260,6 @@ function ChampionName({ lightning }: { lightning: string }) {
 
 export default function Index() {
   const { setTheme } = useTheme();
-  const { toast } = useToast();
   const [resetLabel, setResetLabel] = useState(() => getTimeUntilReset());
   
   // Donation states
@@ -290,6 +280,9 @@ export default function Index() {
     }
     return selectedPreset;
   }, [customAmount, selectedPreset]);
+
+  const pageUrl = typeof window === 'undefined' ? 'https://citadelarcade.com/' : window.location.href;
+  const { count: visitorCount, isLoading: isVisitorCountLoading } = usePageViewCount(HOME_PAGE_VIEW_ID, pageUrl);
 
   const { weekStart, weekEnd } = useMemo(() => getWeekBounds(), []);
   const weekLabel = useMemo(() => {
@@ -383,13 +376,25 @@ export default function Index() {
             </a>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+             <div
+               className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 text-[11px] font-black uppercase tracking-widest text-white/50"
+               title="Visitors"
+               aria-label={`Visitors ${visitorCount.toLocaleString('en-US')}`}
+             >
+               <Eye className="size-3.5 text-sky-400" />
+               <span className="hidden sm:inline">Visitors</span>
+               <span className="tabular-nums text-white/85">
+                 {isVisitorCountLoading ? '…' : visitorCount.toLocaleString('en-US')}
+               </span>
+             </div>
+
              <Button variant="ghost" asChild className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
                 <a href="https://citadelwire.com" target="_blank" rel="noreferrer noopener">
                   NEWS
                 </a>
              </Button>
-
+ 
              <Dialog open={isDonateOpen} onOpenChange={setIsDonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
