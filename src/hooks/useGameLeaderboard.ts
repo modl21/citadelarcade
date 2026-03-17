@@ -37,6 +37,15 @@ export const GAME_CONFIG = {
     imageUrl: 'https://blossom.ditto.pub/fd06b60dd00a90285a77eda43e7c738a9baf93639f64179eff8f95282efd463a.jpeg',
     color: 'green' as const,
   },
+  'citadel-snake': {
+    kind: 1151,
+    tag: 'citadel-snake',
+    title: 'Citadel Snake',
+    subtitle: 'Slither through the wild frontier.',
+    playUrl: 'https://citadelsnake.com',
+    imageUrl: 'https://blossom.ditto.pub/60db7a932ef2cd77b2328739c6e7efb4a1cfd44b9b7a41575bab054b50e01199.jpeg',
+    color: 'red' as const,
+  },
 } as const;
 
 export type GameId = keyof typeof GAME_CONFIG;

@@ -75,12 +75,14 @@ function GameCard({ gameId }: { gameId: GameId }) {
     green: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400',
     amber: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
     blue: 'border-blue-500/20 bg-blue-500/10 text-blue-400',
+    red: 'border-red-500/20 bg-red-500/10 text-red-400',
   }[config.color];
 
   const accentGlow = {
     green: 'shadow-[0_0_40px_-15px_rgba(16,185,129,0.3)]',
     amber: 'shadow-[0_0_40px_-15px_rgba(245,158,11,0.3)]',
     blue: 'shadow-[0_0_40px_-15px_rgba(59,130,246,0.3)]',
+    red: 'shadow-[0_0_40px_-15px_rgba(239,68,68,0.3)]',
   }[config.color];
 
   return (
@@ -565,6 +567,7 @@ export default function Index() {
                   <li><a href="https://citadelrun.com" className="hover:text-white">CITADEL RUN</a></li>
                   <li><a href="https://citadelwar.com" className="hover:text-white">CITADEL WAR</a></li>
                   <li><a href="https://satsinvaders.com" className="hover:text-white">SATS INVADERS</a></li>
+                  <li><a href="https://citadelsnake.com" className="hover:text-white">CITADEL SNAKE</a></li>
                 </ul>
               </div>
               <div className="space-y-4">
