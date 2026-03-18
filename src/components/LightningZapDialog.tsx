@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Zap, Copy, Check, Loader2, ExternalLink, User, Search, X } from 'lucide-react';
+import { Zap, Copy, Check, Loader2, ExternalLink, User } from 'lucide-react';
 import { nip19 } from 'nostr-tools';
-import { NSchema as n } from '@nostrify/nostrify';
-import type { NostrEvent, NostrMetadata } from '@nostrify/nostrify';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,16 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuthor } from '@/hooks/useAuthor';
 import { useNostr } from '@nostrify/react';
 import { publishZapClaim } from '@/hooks/useZapClaims';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 
-const VERIFY_POLL_INTERVAL = 3000;
-const VERIFY_MAX_ATTEMPTS = 100;
-const SEARCH_RELAY = 'wss://antiprimal.net';
-const SEARCH_DEBOUNCE_MS = 400;
+const VERIFY_POLL_INTERVAL = 3000; // poll every 3 seconds
+const VERIFY_MAX_ATTEMPTS = 100;   // give up after ~5 minutes
 
 const PRESETS = [100, 500, 1000, 5000, 21000];
 
@@ -34,17 +30,15 @@ interface LightningZapDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface ProfileResult {
-  pubkey: string;
-  metadata: NostrMetadata;
-}
-
 /** Resolve npub/nprofile to hex pubkey. Returns null on invalid input. */
 function resolveNpub(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
+
   try {
+    // Handle both bare npub and nostr: URIs
     const cleanValue = trimmed.startsWith('nostr:') ? trimmed.slice(6) : trimmed;
+
     if (cleanValue.startsWith('npub1')) {
       const decoded = nip19.decode(cleanValue);
       if (decoded.type === 'npub') return decoded.data;
@@ -53,65 +47,29 @@ function resolveNpub(value: string): string | null {
       const decoded = nip19.decode(cleanValue);
       if (decoded.type === 'nprofile') return decoded.data.pubkey;
     }
+    // Allow raw hex pubkey
     if (/^[0-9a-f]{64}$/.test(cleanValue)) return cleanValue;
-  } catch { /* invalid */ }
+  } catch {
+    // invalid
+  }
   return null;
 }
 
-function parseProfileEvent(event: NostrEvent): ProfileResult | null {
-  if (event.kind !== 0) return null;
-  try {
-    const metadata = n.json().pipe(n.metadata()).parse(event.content);
-    return { pubkey: event.pubkey, metadata };
-  } catch {
-    return null;
-  }
-}
+/** Small inline profile preview. */
+function NpubPreview({ pubkey }: { pubkey: string }) {
+  const { data: author } = useAuthor(pubkey);
+  const meta = author?.metadata;
+  const npub = nip19.npubEncode(pubkey);
 
-/** Profile search results using NIP-50 */
-function useProfileSearch(query: string, enabled: boolean) {
-  const { nostr } = useNostr();
-
-  return useQuery({
-    queryKey: ['profile-search', query],
-    queryFn: async () => {
-      if (!query || query.length < 2) return [];
-
-      const searchRelay = nostr.relay(SEARCH_RELAY);
-      const events = await searchRelay.query(
-        [{ kinds: [0], search: query, limit: 8 }],
-        { signal: AbortSignal.timeout(4000) },
-      );
-
-      const results: ProfileResult[] = [];
-      const seen = new Set<string>();
-
-      for (const event of events) {
-        if (seen.has(event.pubkey)) continue;
-        seen.add(event.pubkey);
-        const parsed = parseProfileEvent(event);
-        if (parsed) results.push(parsed);
-      }
-
-      return results.slice(0, 5);
-    },
-    enabled: enabled && query.length >= 2,
-    staleTime: 60_000,
-    retry: false,
-  });
-}
-
-/** Compact profile row for search results. */
-function ProfileRow({ profile, onSelect }: { profile: ProfileResult; onSelect: () => void }) {
-  const meta = profile.metadata;
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/[0.06]"
+    <a
+      href={`https://primal.net/p/${npub}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 transition-colors hover:bg-white/[0.06]"
     >
-      <Avatar className="size-8 shrink-0 border border-white/10">
-        {meta.picture ? (
+      <Avatar className="size-8 border border-white/10">
+        {meta?.picture ? (
           <AvatarImage src={meta.picture} alt={meta.name ?? 'Profile'} />
         ) : null}
         <AvatarFallback className="bg-white/10 text-white/50 text-xs">
@@ -120,54 +78,16 @@ function ProfileRow({ profile, onSelect }: { profile: ProfileResult; onSelect: (
       </Avatar>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white/90">
-          {meta.display_name || meta.name || nip19.npubEncode(profile.pubkey).slice(0, 16) + '...'}
+          {meta?.display_name || meta?.name || npub.slice(0, 16) + '...'}
         </p>
-        {meta.nip05 && (
+        {meta?.nip05 && (
           <p className="truncate text-[10px] text-white/40">{meta.nip05}</p>
         )}
       </div>
-    </button>
-  );
-}
-
-/** Selected profile preview with link and clear button. */
-function SelectedProfile({ pubkey, metadata, onClear }: { pubkey: string; metadata: NostrMetadata; onClear: () => void }) {
-  const npub = nip19.npubEncode(pubkey);
-
-  return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-      <a
-        href={`https://primal.net/p/${npub}`}
-        target="_blank"
-        rel="noreferrer noopener"
-        className="flex min-w-0 flex-1 items-center gap-2.5 transition-opacity hover:opacity-80"
-      >
-        <Avatar className="size-8 border border-white/10">
-          {metadata.picture ? (
-            <AvatarImage src={metadata.picture} alt={metadata.name ?? 'Profile'} />
-          ) : null}
-          <AvatarFallback className="bg-white/10 text-white/50 text-xs">
-            <User className="size-3.5" />
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-white/90">
-            {metadata.display_name || metadata.name || npub.slice(0, 16) + '...'}
-          </p>
-          {metadata.nip05 && (
-            <p className="truncate text-[10px] text-white/40">{metadata.nip05}</p>
-          )}
-        </div>
-      </a>
-      <button
-        type="button"
-        onClick={onClear}
-        className="shrink-0 rounded-md p-1 text-white/30 transition-colors hover:bg-white/10 hover:text-white/60"
-        aria-label="Remove selection"
-      >
-        <X className="size-3.5" />
-      </button>
-    </div>
+      <div className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-500/70">
+        VERIFIED
+      </div>
+    </a>
   );
 }
 
@@ -178,10 +98,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const [selectedPreset, setSelectedPreset] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedProfile, setSelectedProfile] = useState<ProfileResult | null>(null);
-  const [showResults, setShowResults] = useState(false);
+  const [npubInput, setNpubInput] = useState('');
   const [invoice, setInvoice] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -191,7 +108,6 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const [isPaid, setIsPaid] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef(0);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const amount = useMemo(() => {
     if (customAmount.trim().length > 0) {
@@ -201,43 +117,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
     return selectedPreset;
   }, [customAmount, selectedPreset]);
 
-  // Check if the raw input is already a valid npub/hex
-  const directPubkey = useMemo(() => resolveNpub(searchInput), [searchInput]);
-
-  // The resolved pubkey is either a selected profile or a directly entered npub
-  const resolvedPubkey = selectedProfile?.pubkey ?? directPubkey;
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchInput);
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  // Only search when there's no direct npub match and no selected profile
-  const shouldSearch = !directPubkey && !selectedProfile && searchInput.trim().length >= 2;
-  const { data: searchResults, isLoading: isSearching } = useProfileSearch(debouncedSearch, shouldSearch);
-
-  // Show results dropdown when we have results and should be searching
-  useEffect(() => {
-    if (shouldSearch && searchResults && searchResults.length > 0) {
-      setShowResults(true);
-    } else {
-      setShowResults(false);
-    }
-  }, [shouldSearch, searchResults]);
-
-  // Close results on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  const resolvedPubkey = useMemo(() => resolveNpub(npubInput), [npubInput]);
 
   // Stop polling helper
   const stopPolling = useCallback(() => {
@@ -260,10 +140,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         setCustomAmount('');
         setSelectedPreset(1000);
         setMemo('');
-        setSearchInput('');
-        setDebouncedSearch('');
-        setSelectedProfile(null);
-        setShowResults(false);
+        setNpubInput('');
         setIsGenerating(false);
         setVerifyUrl(null);
         setIsPaid(false);
@@ -294,6 +171,8 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         if (!res.ok) return;
         const data = await res.json();
 
+        // LUD-21 verify response: { settled: true } when paid, { settled: false } when unpaid
+        // Some services use { paid: true/false } or { preimage: "..." } as proof of payment
         const isSettled =
           data.settled === true ||
           data.paid === true ||
@@ -302,6 +181,8 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         if (isSettled) {
           stopPolling();
           setIsPaid(true);
+
+          // Brief delay to show the success state, then close and refresh
           setTimeout(() => {
             onOpenChange(false);
             window.location.reload();
@@ -360,6 +241,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
       setInvoice(pr);
 
+      // Capture verify URL if available (LUD-21)
       if (invData.verify && typeof invData.verify === 'string') {
         setVerifyUrl(invData.verify);
       }
@@ -371,13 +253,15 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       });
       setQrCode(qrDataUrl);
 
-      // Publish zap claim to Nostr if a profile was resolved
+      // Publish zap claim to Nostr if npub was provided
       if (resolvedPubkey) {
         try {
           await publishZapClaim(nostr, resolvedPubkey, lightningAddress, amount);
+          // Invalidate the zap claims query so the leaderboard shows it
           queryClient.invalidateQueries({ queryKey: ['zap-claims', lightningAddress] });
         } catch (claimErr) {
           console.warn('Failed to publish zap claim:', claimErr);
+          // Non-fatal — invoice was already generated
         }
       }
     } catch (err) {
@@ -396,17 +280,6 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const handleOpenInWallet = useCallback(() => {
     window.open(`lightning:${invoice}`, '_blank');
   }, [invoice]);
-
-  const handleSelectProfile = useCallback((profile: ProfileResult) => {
-    setSelectedProfile(profile);
-    setSearchInput('');
-    setShowResults(false);
-  }, []);
-
-  const handleClearProfile = useCallback(() => {
-    setSelectedProfile(null);
-    setSearchInput('');
-  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -456,69 +329,27 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
               />
             </div>
 
-            {/* Profile search for social credit */}
-            <div className="space-y-2" ref={searchContainerRef}>
+            {/* Npub input for social credit */}
+            <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">
-                YOUR PROFILE <span className="text-white/15 normal-case">(optional — get social credit)</span>
+                YOUR NPUB <span className="text-white/15 normal-case">(optional — get social credit)</span>
               </Label>
-
-              {selectedProfile ? (
-                <SelectedProfile
-                  pubkey={selectedProfile.pubkey}
-                  metadata={selectedProfile.metadata}
-                  onClear={handleClearProfile}
-                />
-              ) : (
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/20" />
-                    <Input
-                      placeholder="SEARCH NAME, NIP-05, OR PASTE NPUB"
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      onFocus={() => {
-                        if (shouldSearch && searchResults && searchResults.length > 0) {
-                          setShowResults(true);
-                        }
-                      }}
-                      className="h-10 border-white/5 bg-white/5 pl-9 text-sm text-white placeholder:text-white/20"
-                    />
-                    {isSearching && (
-                      <Loader2 className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-white/30" />
-                    )}
-                  </div>
-
-                  {/* Search results dropdown */}
-                  {showResults && searchResults && searchResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-white/[0.08] bg-[#111] shadow-xl animate-in fade-in-50 slide-in-from-top-1 duration-150">
-                      <ScrollArea className="max-h-[200px]">
-                        <div className="py-1">
-                          {searchResults.map((profile) => (
-                            <ProfileRow
-                              key={profile.pubkey}
-                              profile={profile}
-                              onSelect={() => handleSelectProfile(profile)}
-                            />
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  )}
-
-                  {/* Direct npub match indicator */}
-                  {directPubkey && (
-                    <p className="mt-1.5 text-[10px] font-bold text-emerald-500/70 uppercase">
-                      VALID NPUB DETECTED
-                    </p>
-                  )}
-
-                  {/* Empty search state */}
-                  {shouldSearch && !isSearching && debouncedSearch === searchInput && searchResults && searchResults.length === 0 && (
-                    <p className="mt-1.5 text-[10px] font-bold text-white/20 uppercase">
-                      NO PROFILES FOUND
-                    </p>
-                  )}
+              <Input
+                placeholder="npub1..."
+                value={npubInput}
+                onChange={(e) => setNpubInput(e.target.value)}
+                className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white placeholder:text-white/20"
+              />
+              {/* Profile preview */}
+              {resolvedPubkey && (
+                <div className="animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                  <NpubPreview pubkey={resolvedPubkey} />
                 </div>
+              )}
+              {npubInput.trim() && !resolvedPubkey && (
+                <p className="text-[10px] font-bold text-red-400/80 uppercase">
+                  INVALID NPUB — ENTER A VALID npub1... ADDRESS
+                </p>
               )}
             </div>
 
