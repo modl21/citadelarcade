@@ -34,6 +34,7 @@ import {
   usePreviousChampion, 
   useTotalRunCount, 
   useNip05Npub,
+  useLnurlValid,
   usePageViewCount,
   getTimeUntilReset,
   getWeekBounds,
@@ -198,6 +199,7 @@ function GameCard({ gameId }: { gameId: GameId }) {
 
 function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
   const { data: npub } = useNip05Npub(entry.lightning);
+  const { data: isZappable } = useLnurlValid(entry.lightning);
   const [zapOpen, setZapOpen] = useState(false);
 
   return (
@@ -231,28 +233,33 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
         <span className="font-mono text-[11px] font-bold tabular-nums">
           {entry.score.toLocaleString()}
         </span>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setZapOpen(true); }}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_12px_-3px_rgba(245,158,11,0.4)]"
-          title={`Zap ${entry.lightning}`}
-          aria-label={`Zap ${entry.lightning}`}
-        >
-          <Zap className="size-3.5" />
-        </button>
+        {isZappable && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setZapOpen(true); }}
+            className="inline-flex size-7 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_12px_-3px_rgba(245,158,11,0.4)]"
+            title={`Zap ${entry.lightning}`}
+            aria-label={`Zap ${entry.lightning}`}
+          >
+            <Zap className="size-3.5" />
+          </button>
+        )}
       </div>
 
-      <LightningZapDialog
-        lightningAddress={entry.lightning}
-        open={zapOpen}
-        onOpenChange={setZapOpen}
-      />
+      {isZappable && (
+        <LightningZapDialog
+          lightningAddress={entry.lightning}
+          open={zapOpen}
+          onOpenChange={setZapOpen}
+        />
+      )}
     </div>
   );
 }
 
 function ChampionName({ lightning }: { lightning: string }) {
   const { data: npub } = useNip05Npub(lightning);
+  const { data: isZappable } = useLnurlValid(lightning);
   const [zapOpen, setZapOpen] = useState(false);
 
   return (
@@ -277,21 +284,25 @@ function ChampionName({ lightning }: { lightning: string }) {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setZapOpen(true)}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_16px_-3px_rgba(245,158,11,0.4)]"
-          title={`Zap ${lightning}`}
-          aria-label={`Zap ${lightning}`}
-        >
-          <Zap className="size-4" />
-        </button>
+        {isZappable && (
+          <>
+            <button
+              type="button"
+              onClick={() => setZapOpen(true)}
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_16px_-3px_rgba(245,158,11,0.4)]"
+              title={`Zap ${lightning}`}
+              aria-label={`Zap ${lightning}`}
+            >
+              <Zap className="size-4" />
+            </button>
 
-        <LightningZapDialog
-          lightningAddress={lightning}
-          open={zapOpen}
-          onOpenChange={setZapOpen}
-        />
+            <LightningZapDialog
+              lightningAddress={lightning}
+              open={zapOpen}
+              onOpenChange={setZapOpen}
+            />
+          </>
+        )}
       </div>
 
       <TopZappers lightningAddress={lightning} />

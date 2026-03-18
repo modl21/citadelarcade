@@ -421,6 +421,36 @@ export function useNip05Npub(lightning: string) {
   });
 }
 
+// ─── LNURL-pay validation ─────────────────────────────────────────────────────
+
+async function checkLnurlPay(lightning: string): Promise<boolean> {
+  const [name, domain] = lightning.split('@');
+  if (!name || !domain) return false;
+
+  try {
+    const response = await fetch(`https://${domain}/.well-known/lnurlp/${name}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (data.status === 'ERROR') return false;
+    // A valid LNURL-pay endpoint must have a callback
+    return typeof data.callback === 'string' && data.callback.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function useLnurlValid(lightning: string) {
+  return useQuery({
+    queryKey: ['lnurl-valid', lightning],
+    queryFn: () => checkLnurlPay(lightning),
+    staleTime: 24 * 60 * 60_000, // 24 hours
+    gcTime: 24 * 60 * 60_000,
+    retry: false,
+  });
+}
+
 export function usePageViewCount(pageId: string, pageUrl: string) {
   const { nostr } = useNostr();
   const queryClient = useQueryClient();
