@@ -171,8 +171,14 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         if (!res.ok) return;
         const data = await res.json();
 
-        // LUD-21: { settled: true } or some services use { status: "OK" } / { paid: true }
-        if (data.settled === true || data.paid === true || data.status === 'OK') {
+        // LUD-21 verify response: { settled: true } when paid, { settled: false } when unpaid
+        // Some services use { paid: true/false } or { preimage: "..." } as proof of payment
+        const isSettled =
+          data.settled === true ||
+          data.paid === true ||
+          (typeof data.preimage === 'string' && data.preimage.length > 0);
+
+        if (isSettled) {
           stopPolling();
           setIsPaid(true);
 
