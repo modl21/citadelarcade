@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Zap, Copy, Check, Loader2, ExternalLink, User } from 'lucide-react';
 import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,9 @@ import { useNostr } from '@nostrify/react';
 import { publishZapClaim } from '@/hooks/useZapClaims';
 import { useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
+
+const VERIFY_POLL_INTERVAL = 3000; // poll every 3 seconds
+const VERIFY_MAX_ATTEMPTS = 100;   // give up after ~5 minutes
 
 const PRESETS = [100, 500, 1000, 5000, 21000];
 
@@ -101,6 +104,10 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
+  const [isPaid, setIsPaid] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attemptRef = useRef(0);
 
   const amount = useMemo(() => {
     if (customAmount.trim().length > 0) {
@@ -112,9 +119,19 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
   const resolvedPubkey = useMemo(() => resolveNpub(npubInput), [npubInput]);
 
+  // Stop polling helper
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    attemptRef.current = 0;
+  }, []);
+
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
+      stopPolling();
       const timeout = setTimeout(() => {
         setInvoice('');
         setQrCode('');
@@ -125,10 +142,53 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         setMemo('');
         setNpubInput('');
         setIsGenerating(false);
+        setVerifyUrl(null);
+        setIsPaid(false);
       }, 200);
       return () => clearTimeout(timeout);
     }
-  }, [open]);
+  }, [open, stopPolling]);
+
+  // Cleanup polling on unmount
+  useEffect(() => stopPolling, [stopPolling]);
+
+  // Poll the verify URL to detect payment
+  useEffect(() => {
+    if (!verifyUrl || !invoice || isPaid) return;
+
+    stopPolling();
+    attemptRef.current = 0;
+
+    pollRef.current = setInterval(async () => {
+      attemptRef.current += 1;
+      if (attemptRef.current > VERIFY_MAX_ATTEMPTS) {
+        stopPolling();
+        return;
+      }
+
+      try {
+        const res = await fetch(verifyUrl);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // LUD-21: { settled: true } or some services use { status: "OK" } / { paid: true }
+        if (data.settled === true || data.paid === true || data.status === 'OK') {
+          stopPolling();
+          setIsPaid(true);
+
+          // Brief delay to show the success state, then close and refresh
+          setTimeout(() => {
+            onOpenChange(false);
+            window.location.reload();
+          }, 1500);
+        }
+      } catch {
+        // Network error — keep polling
+      }
+    }, VERIFY_POLL_INTERVAL);
+
+    return stopPolling;
+  }, [verifyUrl, invoice, isPaid, stopPolling, onOpenChange]);
 
   const handleGenerate = useCallback(async () => {
     if (amount < 1) {
@@ -174,6 +234,11 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       if (!pr) throw new Error('No invoice returned from service');
 
       setInvoice(pr);
+
+      // Capture verify URL if available (LUD-21)
+      if (invData.verify && typeof invData.verify === 'string') {
+        setVerifyUrl(invData.verify);
+      }
 
       const qrDataUrl = await QRCode.toDataURL(`lightning:${pr}`, {
         width: 512,
@@ -317,6 +382,17 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
               <p className="text-center text-[10px] font-black uppercase text-red-500">{error}</p>
             )}
           </div>
+        ) : isPaid ? (
+          <div className="mt-2 flex flex-col items-center gap-5 py-8 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex size-20 items-center justify-center rounded-full bg-emerald-500/20 ring-2 ring-emerald-500/40">
+              <Check className="size-10 text-emerald-400" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-xl font-black uppercase text-emerald-400">PAYMENT RECEIVED</p>
+              <p className="font-mono text-lg font-bold text-white/80">{amount.toLocaleString()} sats</p>
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">REFRESHING...</p>
+          </div>
         ) : (
           <div className="mt-2 flex flex-col items-center gap-5">
             {/* Amount display */}
@@ -329,6 +405,14 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
             {qrCode && (
               <div className="rounded-xl bg-white p-3 shadow-[0_0_60px_-15px_rgba(245,158,11,0.3)]">
                 <img src={qrCode} alt="Lightning Invoice QR" className="size-52" />
+              </div>
+            )}
+
+            {/* Payment detection indicator */}
+            {verifyUrl && (
+              <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
+                <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">WAITING FOR PAYMENT...</span>
               </div>
             )}
 
@@ -365,7 +449,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
             {/* Reset */}
             <Button
               variant="ghost"
-              onClick={() => { setInvoice(''); setQrCode(''); }}
+              onClick={() => { setInvoice(''); setQrCode(''); setVerifyUrl(null); stopPolling(); }}
               className="text-[10px] font-black text-white/30 hover:text-white/60"
             >
               CHANGE AMOUNT
