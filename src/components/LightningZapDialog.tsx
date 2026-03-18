@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Zap, Copy, Check, Loader2, ExternalLink } from 'lucide-react';
+import { Zap, Copy, Check, Loader2, ExternalLink, User } from 'lucide-react';
+import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,6 +12,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useAuthor } from '@/hooks/useAuthor';
+import { useNostr } from '@nostrify/react';
+import { publishZapClaim } from '@/hooks/useZapClaims';
+import { useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 
 const PRESETS = [100, 500, 1000, 5000, 21000];
@@ -21,10 +27,75 @@ interface LightningZapDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/** Resolve npub/nprofile to hex pubkey. Returns null on invalid input. */
+function resolveNpub(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    // Handle both bare npub and nostr: URIs
+    const cleanValue = trimmed.startsWith('nostr:') ? trimmed.slice(6) : trimmed;
+
+    if (cleanValue.startsWith('npub1')) {
+      const decoded = nip19.decode(cleanValue);
+      if (decoded.type === 'npub') return decoded.data;
+    }
+    if (cleanValue.startsWith('nprofile1')) {
+      const decoded = nip19.decode(cleanValue);
+      if (decoded.type === 'nprofile') return decoded.data.pubkey;
+    }
+    // Allow raw hex pubkey
+    if (/^[0-9a-f]{64}$/.test(cleanValue)) return cleanValue;
+  } catch {
+    // invalid
+  }
+  return null;
+}
+
+/** Small inline profile preview. */
+function NpubPreview({ pubkey }: { pubkey: string }) {
+  const { data: author } = useAuthor(pubkey);
+  const meta = author?.metadata;
+  const npub = nip19.npubEncode(pubkey);
+
+  return (
+    <a
+      href={`https://primal.net/p/${npub}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 transition-colors hover:bg-white/[0.06]"
+    >
+      <Avatar className="size-8 border border-white/10">
+        {meta?.picture ? (
+          <AvatarImage src={meta.picture} alt={meta.name ?? 'Profile'} />
+        ) : null}
+        <AvatarFallback className="bg-white/10 text-white/50 text-xs">
+          <User className="size-3.5" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-white/90">
+          {meta?.display_name || meta?.name || npub.slice(0, 16) + '...'}
+        </p>
+        {meta?.nip05 && (
+          <p className="truncate text-[10px] text-white/40">{meta.nip05}</p>
+        )}
+      </div>
+      <div className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-500/70">
+        VERIFIED
+      </div>
+    </a>
+  );
+}
+
 export function LightningZapDialog({ lightningAddress, open, onOpenChange }: LightningZapDialogProps) {
+  const { nostr } = useNostr();
+  const queryClient = useQueryClient();
+
   const [selectedPreset, setSelectedPreset] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [memo, setMemo] = useState('');
+  const [npubInput, setNpubInput] = useState('');
   const [invoice, setInvoice] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,10 +110,11 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
     return selectedPreset;
   }, [customAmount, selectedPreset]);
 
+  const resolvedPubkey = useMemo(() => resolveNpub(npubInput), [npubInput]);
+
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      // Small delay to reset after animation
       const timeout = setTimeout(() => {
         setInvoice('');
         setQrCode('');
@@ -51,6 +123,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         setCustomAmount('');
         setSelectedPreset(1000);
         setMemo('');
+        setNpubInput('');
         setIsGenerating(false);
       }, 200);
       return () => clearTimeout(timeout);
@@ -77,7 +150,6 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       const payInfo = await response.json();
       if (payInfo.status === 'ERROR') throw new Error(payInfo.reason || 'Lightning service error');
 
-      // Check min/max sendable
       const minSendable = Math.ceil((payInfo.minSendable || 1000) / 1000);
       const maxSendable = Math.floor((payInfo.maxSendable || 1_000_000_000) / 1000);
 
@@ -88,7 +160,6 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       const callbackUrl = new URL(payInfo.callback);
       callbackUrl.searchParams.set('amount', amountMsats.toString());
 
-      // Only include comment if the service supports it and memo is non-empty
       if (memo.trim() && payInfo.commentAllowed && payInfo.commentAllowed > 0) {
         callbackUrl.searchParams.set('comment', memo.trim().slice(0, payInfo.commentAllowed));
       }
@@ -104,19 +175,30 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
       setInvoice(pr);
 
-      // Generate QR code
       const qrDataUrl = await QRCode.toDataURL(`lightning:${pr}`, {
         width: 512,
         margin: 2,
         color: { dark: '#000000', light: '#FFFFFF' },
       });
       setQrCode(qrDataUrl);
+
+      // Publish zap claim to Nostr if npub was provided
+      if (resolvedPubkey) {
+        try {
+          await publishZapClaim(nostr, resolvedPubkey, lightningAddress, amount);
+          // Invalidate the zap claims query so the leaderboard shows it
+          queryClient.invalidateQueries({ queryKey: ['zap-claims', lightningAddress] });
+        } catch (claimErr) {
+          console.warn('Failed to publish zap claim:', claimErr);
+          // Non-fatal — invoice was already generated
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error generating invoice');
     } finally {
       setIsGenerating(false);
     }
-  }, [amount, lightningAddress, memo]);
+  }, [amount, lightningAddress, memo, resolvedPubkey, nostr, queryClient]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(invoice);
@@ -130,7 +212,7 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/[0.06] bg-[#0a0a0a] text-white sm:max-w-md">
+      <DialogContent className="border-white/[0.06] bg-[#0a0a0a] text-white sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-black uppercase tracking-tight">
             {invoice ? 'PAY INVOICE' : 'ZAP'}
@@ -174,6 +256,30 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
                 onChange={(e) => setCustomAmount(e.target.value)}
                 className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white placeholder:text-white/20"
               />
+            </div>
+
+            {/* Npub input for social credit */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">
+                YOUR NPUB <span className="text-white/15 normal-case">(optional — get social credit)</span>
+              </Label>
+              <Input
+                placeholder="npub1..."
+                value={npubInput}
+                onChange={(e) => setNpubInput(e.target.value)}
+                className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white placeholder:text-white/20"
+              />
+              {/* Profile preview */}
+              {resolvedPubkey && (
+                <div className="animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                  <NpubPreview pubkey={resolvedPubkey} />
+                </div>
+              )}
+              {npubInput.trim() && !resolvedPubkey && (
+                <p className="text-[10px] font-bold text-red-400/80 uppercase">
+                  INVALID NPUB — ENTER A VALID npub1... ADDRESS
+                </p>
+              )}
             </div>
 
             {/* Memo */}
