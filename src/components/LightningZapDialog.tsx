@@ -23,7 +23,7 @@ import QRCode from 'qrcode';
 
 const VERIFY_POLL_INTERVAL = 3000;
 const VERIFY_MAX_ATTEMPTS = 100;
-const SEARCH_RELAY = 'wss://relay.nostr.band';
+const SEARCH_RELAY = 'wss://antiprimal.net';
 const SEARCH_DEBOUNCE_MS = 400;
 
 const PRESETS = [100, 500, 1000, 5000, 21000];
