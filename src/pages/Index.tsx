@@ -165,7 +165,7 @@ function GameCard({ gameId }: { gameId: GameId }) {
 
           {champion ? (
             <div className="relative space-y-4">
-              <div className="absolute -right-2 -top-1 opacity-10">
+              <div className="pointer-events-none absolute -right-2 -top-1 opacity-10">
                 <Crown className="size-20" />
               </div>
               <div className="space-y-1">
