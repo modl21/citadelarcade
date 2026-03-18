@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from '@/hooks/useTheme';
+import { LightningZapDialog } from '@/components/LightningZapDialog';
 import { 
   useCurrentLeaderboard, 
   usePreviousChampion, 
@@ -196,63 +197,97 @@ function GameCard({ gameId }: { gameId: GameId }) {
 
 function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
   const { data: npub } = useNip05Npub(entry.lightning);
+  const [zapOpen, setZapOpen] = useState(false);
 
-  const content = (
-    <div 
+  return (
+    <div
       className={`flex h-11 items-center justify-between rounded-lg border px-3 transition-colors ${
-        rank === 0 
-          ? 'border-amber-500/20 bg-amber-500/5 text-amber-200' 
+        rank === 0
+          ? 'border-amber-500/20 bg-amber-500/5 text-amber-200'
           : 'border-transparent bg-white/[0.03] text-white/70 hover:bg-white/[0.05]'
       }`}
     >
-      <div className="flex items-center gap-3 overflow-hidden">
+      <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
         <span className="shrink-0 font-mono text-[10px] font-bold text-white/20">0{rank + 1}</span>
-        <span className="truncate text-sm font-semibold tracking-tight">{entry.lightning}</span>
+        {npub ? (
+          <a
+            href={`https://primal.net/p/${npub}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="truncate text-sm font-semibold tracking-tight hover:underline underline-offset-2 decoration-white/20"
+          >
+            {entry.lightning}
+          </a>
+        ) : (
+          <span className="truncate text-sm font-semibold tracking-tight">{entry.lightning}</span>
+        )}
       </div>
-      <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums">
-        {entry.score.toLocaleString()}
-      </span>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="font-mono text-[11px] font-bold tabular-nums">
+          {entry.score.toLocaleString()}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setZapOpen(true); }}
+          className="inline-flex size-7 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_12px_-3px_rgba(245,158,11,0.4)]"
+          title={`Zap ${entry.lightning}`}
+          aria-label={`Zap ${entry.lightning}`}
+        >
+          <Zap className="size-3.5" />
+        </button>
+      </div>
+
+      <LightningZapDialog
+        lightningAddress={entry.lightning}
+        open={zapOpen}
+        onOpenChange={setZapOpen}
+      />
     </div>
   );
-
-  if (npub) {
-    return (
-      <a 
-        href={`https://primal.net/p/${npub}`} 
-        target="_blank" 
-        rel="noreferrer noopener"
-        className="block"
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return content;
 }
 
 function ChampionName({ lightning }: { lightning: string }) {
   const { data: npub } = useNip05Npub(lightning);
-
-  if (npub) {
-    return (
-      <a 
-        href={`https://primal.net/p/${npub}`} 
-        target="_blank" 
-        rel="noreferrer noopener"
-        className="block hover:underline underline-offset-4 decoration-white/20"
-      >
-        <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
-          {lightning}
-        </p>
-      </a>
-    );
-  }
+  const [zapOpen, setZapOpen] = useState(false);
 
   return (
-    <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
-      {lightning}
-    </p>
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        {npub ? (
+          <a
+            href={`https://primal.net/p/${npub}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="block hover:underline underline-offset-4 decoration-white/20"
+          >
+            <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
+              {lightning}
+            </p>
+          </a>
+        ) : (
+          <p className="max-w-full truncate text-2xl font-black tracking-tight text-white/90">
+            {lightning}
+          </p>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setZapOpen(true)}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-all hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 hover:shadow-[0_0_16px_-3px_rgba(245,158,11,0.4)]"
+        title={`Zap ${lightning}`}
+        aria-label={`Zap ${lightning}`}
+      >
+        <Zap className="size-4" />
+      </button>
+
+      <LightningZapDialog
+        lightningAddress={lightning}
+        open={zapOpen}
+        onOpenChange={setZapOpen}
+      />
+    </div>
   );
 }
 
