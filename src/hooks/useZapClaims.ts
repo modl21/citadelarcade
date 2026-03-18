@@ -137,12 +137,13 @@ export function useZapClaims(lightningAddress: string) {
   return useQuery({
     queryKey: ['zap-claims', lightningAddress],
     queryFn: async () => {
+      // Query by kind + t tag (both relay-indexed). The multi-letter "lightning"
+      // tag is NOT indexed by relays, so we filter by lightning address client-side.
       const events = await nostr.query([
         {
           kinds: [ZAP_CLAIM_KIND],
           '#t': [ZAP_CLAIM_TAG],
-          '#lightning': [lightningAddress],
-          limit: 200,
+          limit: 500,
         },
       ]);
 
