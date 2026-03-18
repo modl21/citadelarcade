@@ -49,10 +49,10 @@ const DONATION_PRESETS = [1000, 5000, 10000, 21000, 42000];
 
 // ─── Formatting ─────────────────────────────────────────────────────────────
 
-const SATS_FORMATTER = new Intl.NumberFormat('en-US');
+const NUM_FORMATTER = new Intl.NumberFormat('en-US');
 
 function formatNumber(value: number): string {
-  return SATS_FORMATTER.format(value);
+  return NUM_FORMATTER.format(value);
 }
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ function GameCard({ gameId }: { gameId: GameId }) {
               <div className="space-y-1">
                 <ChampionName lightning={champion.lightning} />
                 <p className="font-mono text-sm font-bold text-amber-500/80">
-                  {champion.score.toLocaleString()} SATS
+                  {champion.score.toLocaleString()} PTS
                 </p>
               </div>
               
