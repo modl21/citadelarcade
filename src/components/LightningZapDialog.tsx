@@ -415,12 +415,10 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
             )}
 
             {/* Payment detection indicator */}
-            {verifyUrl && (
-              <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
-                <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">WAITING FOR PAYMENT...</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
+              <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">WAITING FOR PAYMENT...</span>
+            </div>
 
             {/* Invoice string */}
             <div className="w-full space-y-2">
@@ -452,14 +450,32 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
               </Button>
             </div>
 
-            {/* Reset */}
-            <Button
-              variant="ghost"
-              onClick={() => { setInvoice(''); setQrCode(''); setVerifyUrl(null); stopPolling(); }}
-              className="text-[10px] font-black text-white/30 hover:text-white/60"
-            >
-              CHANGE AMOUNT
-            </Button>
+            {/* Paid / Change buttons */}
+            <div className="flex w-full items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => { setInvoice(''); setQrCode(''); setVerifyUrl(null); stopPolling(); }}
+                className="text-[10px] font-black text-white/30 hover:text-white/60"
+              >
+                CHANGE AMOUNT
+              </Button>
+              <div className="h-3 w-px bg-white/10" />
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  stopPolling();
+                  setIsPaid(true);
+                  setTimeout(() => {
+                    onOpenChange(false);
+                    window.location.reload();
+                  }, 1500);
+                }}
+                className="text-[10px] font-black text-emerald-500/70 hover:text-emerald-400"
+              >
+                <Check className="mr-1.5 size-3" />
+                I ALREADY PAID
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>
