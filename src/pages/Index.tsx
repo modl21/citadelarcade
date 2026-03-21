@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSeoMeta } from '@unhead/react';
 import {
   Trophy,
@@ -9,11 +9,14 @@ import {
   Loader2,
   Zap,
   Eye,
+  User,
+  X,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -27,6 +30,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuthor } from '@/hooks/useAuthor';
+import { useNostr } from '@nostrify/react';
+import { publishZapClaim } from '@/hooks/useZapClaims';
+import { useQueryClient } from '@tanstack/react-query';
 import { LightningZapDialog } from '@/components/LightningZapDialog';
 import { TopZappers } from '@/components/TopZappers';
 import { 
@@ -310,10 +317,66 @@ function ChampionName({ lightning }: { lightning: string }) {
   );
 }
 
+// ─── NIP-05 lookup helper ────────────────────────────────────────────────────
+
+async function resolveNip05ToPubkey(nip05: string): Promise<string | null> {
+  const trimmed = nip05.trim().toLowerCase();
+  if (!trimmed.includes('@')) return null;
+  const [name, domain] = trimmed.split('@');
+  if (!name || !domain) return null;
+
+  try {
+    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const pubkey = data.names?.[name];
+    if (pubkey && /^[0-9a-f]{64}$/.test(pubkey)) return pubkey;
+  } catch { /* fail silently */ }
+  return null;
+}
+
+function DonateProfilePreview({ pubkey, onClear }: { pubkey: string; onClear: () => void }) {
+  const { data: author } = useAuthor(pubkey);
+  const meta = author?.metadata;
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+      <Avatar className="size-8 border border-white/10">
+        {meta?.picture ? (
+          <AvatarImage src={meta.picture} alt={meta.name ?? 'Profile'} />
+        ) : null}
+        <AvatarFallback className="bg-white/10 text-white/50 text-xs">
+          <User className="size-3.5" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-white/90">
+          {meta?.display_name || meta?.name || pubkey.slice(0, 12) + '...'}
+        </p>
+        {meta?.nip05 && (
+          <p className="truncate text-[10px] text-white/40">{meta.nip05}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="shrink-0 rounded-md p-1 text-white/30 transition-colors hover:bg-white/10 hover:text-white/60"
+        aria-label="Remove"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function Index() {
   const { setTheme } = useTheme();
+  const { nostr } = useNostr();
+  const queryClient = useQueryClient();
   const [resetLabel, setResetLabel] = useState(() => getTimeUntilReset());
   
   // Donation states
@@ -326,6 +389,40 @@ export default function Index() {
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [donationError, setDonationError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  
+  // Donate NIP-05 states
+  const [donateNip05, setDonateNip05] = useState('');
+  const [donatePubkey, setDonatePubkey] = useState<string | null>(null);
+  const [isResolvingNip05, setIsResolvingNip05] = useState(false);
+  const [nip05Error, setNip05Error] = useState<string | null>(null);
+
+  const handleLookupNip05 = useCallback(async () => {
+    const trimmed = donateNip05.trim();
+    if (!trimmed) return;
+
+    setNip05Error(null);
+    setIsResolvingNip05(true);
+    setDonatePubkey(null);
+
+    try {
+      const pubkey = await resolveNip05ToPubkey(trimmed);
+      if (pubkey) {
+        setDonatePubkey(pubkey);
+      } else {
+        setNip05Error('NOT FOUND — CHECK THE ADDRESS AND TRY AGAIN');
+      }
+    } catch {
+      setNip05Error('LOOKUP FAILED');
+    } finally {
+      setIsResolvingNip05(false);
+    }
+  }, [donateNip05]);
+
+  const handleClearDonateProfile = useCallback(() => {
+    setDonatePubkey(null);
+    setDonateNip05('');
+    setNip05Error(null);
+  }, []);
 
   const donationAmount = useMemo(() => {
     if (customAmount.trim().length > 0) {
@@ -396,6 +493,16 @@ export default function Index() {
       
       const QRCode = (await import('qrcode')).default;
       setInvoiceQrCode(await QRCode.toDataURL(`lightning:${invData.pr || invData.paymentRequest}`));
+
+      // Publish zap claim for the donation if profile was resolved
+      if (donatePubkey) {
+        try {
+          await publishZapClaim(nostr, donatePubkey, LIGHTNING_ADDRESS, donationAmount);
+          queryClient.invalidateQueries({ queryKey: ['zap-claims', LIGHTNING_ADDRESS] });
+        } catch (claimErr) {
+          console.warn('Failed to publish donation zap claim:', claimErr);
+        }
+      }
     } catch (error) {
       setDonationError(error instanceof Error ? error.message : 'Error generating invoice');
     } finally {
@@ -449,7 +556,7 @@ export default function Index() {
                 </a>
              </Button>
  
-             <Dialog open={isDonateOpen} onOpenChange={setIsDonateOpen}>
+             <Dialog open={isDonateOpen} onOpenChange={(v) => { setIsDonateOpen(v); if (!v) { handleClearDonateProfile(); } }}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" className="h-9 px-4 text-[11px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5 hover:text-white">
                     DONATE
@@ -497,6 +604,35 @@ export default function Index() {
                             className="resize-none border-white/5 bg-white/5 text-sm text-white"
                             rows={3}
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">
+                            YOUR NOSTR USERNAME <span className="text-white/15 normal-case">(optional — get social credit)</span>
+                          </Label>
+                          {donatePubkey ? (
+                            <DonateProfilePreview pubkey={donatePubkey} onClear={handleClearDonateProfile} />
+                          ) : (
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="user@domain.com"
+                                value={donateNip05}
+                                onChange={(e) => { setDonateNip05(e.target.value); setNip05Error(null); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleLookupNip05(); } }}
+                                className="h-10 flex-1 border-white/5 bg-white/5 text-sm text-white placeholder:text-white/20"
+                              />
+                              <Button
+                                type="button"
+                                onClick={handleLookupNip05}
+                                disabled={isResolvingNip05 || !donateNip05.trim()}
+                                className="h-10 shrink-0 bg-white/10 text-[10px] font-black text-white/70 hover:bg-white/20 disabled:opacity-30"
+                              >
+                                {isResolvingNip05 ? <Loader2 className="size-3.5 animate-spin" /> : 'LOOKUP'}
+                              </Button>
+                            </div>
+                          )}
+                          {nip05Error && (
+                            <p className="text-[10px] font-bold text-red-400/80 uppercase">{nip05Error}</p>
+                          )}
                         </div>
                       </div>
                       <Button 
