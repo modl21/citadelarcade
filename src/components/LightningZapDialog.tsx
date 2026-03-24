@@ -117,9 +117,12 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
+  const [invoiceCreatedAt, setInvoiceCreatedAt] = useState<number | null>(null);
+  const [receiptAuthorPubkey, setReceiptAuthorPubkey] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef(0);
+  const isCheckingRef = useRef(false);
 
   const amount = useMemo(() => {
     if (customAmount.trim().length > 0) {
@@ -184,6 +187,8 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         setNip05Error(null);
         setIsGenerating(false);
         setVerifyUrl(null);
+        setInvoiceCreatedAt(null);
+        setReceiptAuthorPubkey(null);
         setIsPaid(false);
       }, 200);
       return () => clearTimeout(timeout);
@@ -193,49 +198,91 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   // Cleanup polling on unmount
   useEffect(() => stopPolling, [stopPolling]);
 
-  // Poll the verify URL to detect payment
+  // Poll for payment detection (LNURL verify + Nostr zap receipts fallback)
   useEffect(() => {
-    if (!verifyUrl || !invoice || isPaid) return;
+    if (!invoice || isPaid || !invoiceCreatedAt || !receiptAuthorPubkey) return;
 
     stopPolling();
     attemptRef.current = 0;
 
     pollRef.current = setInterval(async () => {
-      attemptRef.current += 1;
-      if (attemptRef.current > VERIFY_MAX_ATTEMPTS) {
-        stopPolling();
-        return;
-      }
+      if (isCheckingRef.current) return;
+      isCheckingRef.current = true;
 
       try {
-        const res = await fetch(verifyUrl);
-        if (!res.ok) return;
-        const data = await res.json();
+        attemptRef.current += 1;
+        if (attemptRef.current > VERIFY_MAX_ATTEMPTS) {
+          stopPolling();
+          return;
+        }
 
-        // LUD-21 verify response: { settled: true } when paid, { settled: false } when unpaid
-        // Some services use { paid: true/false } or { preimage: "..." } as proof of payment
-        const isSettled =
-          data.settled === true ||
-          data.paid === true ||
-          (typeof data.preimage === 'string' && data.preimage.length > 0);
+        // 1) Primary: LNURL verify endpoint when available
+        let settledByVerify = false;
+        if (verifyUrl) {
+          try {
+            const res = await fetch(verifyUrl);
+            if (res.ok) {
+              const data = await res.json();
+              settledByVerify =
+                data.settled === true ||
+                data.paid === true ||
+                (typeof data.preimage === 'string' && data.preimage.length > 0);
+            }
+          } catch {
+            // ignore and continue to receipt check
+          }
+        }
 
-        if (isSettled) {
+        // 2) Fallback/backup: poll Nostr zap receipts (kind 9735)
+        let settledByReceipt = false;
+        if (!settledByVerify) {
+          try {
+            const since = Math.max(0, invoiceCreatedAt - 120); // small skew allowance
+            const receipts = await nostr.query([
+              {
+                kinds: [9735],
+                authors: [receiptAuthorPubkey],
+                '#p': [receiptAuthorPubkey],
+                since,
+                limit: 50,
+              },
+            ], { signal: AbortSignal.timeout(3500) });
+
+            settledByReceipt = receipts.some((event) => {
+              const bolt11 = event.tags.find(([name]) => name === 'bolt11')?.[1]?.toLowerCase();
+              if (!bolt11) return false;
+              // Match invoice directly for strong confirmation
+              return bolt11 === invoice.toLowerCase();
+            });
+          } catch {
+            // ignore this round
+          }
+        }
+
+        if (settledByVerify || settledByReceipt) {
           stopPolling();
           setIsPaid(true);
-
-          // Brief delay to show the success state, then close and refresh
           setTimeout(() => {
             onOpenChange(false);
             window.location.reload();
           }, 1500);
         }
-      } catch {
-        // Network error — keep polling
+      } finally {
+        isCheckingRef.current = false;
       }
     }, VERIFY_POLL_INTERVAL);
 
     return stopPolling;
-  }, [verifyUrl, invoice, isPaid, stopPolling, onOpenChange]);
+  }, [
+    invoice,
+    isPaid,
+    invoiceCreatedAt,
+    receiptAuthorPubkey,
+    verifyUrl,
+    stopPolling,
+    onOpenChange,
+    nostr,
+  ]);
 
   const handleGenerate = useCallback(async () => {
     if (amount < 1) {
@@ -256,6 +303,15 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
       const payInfo = await response.json();
       if (payInfo.status === 'ERROR') throw new Error(payInfo.reason || 'Lightning service error');
+
+      // Capture expected zap receipt author from LNURL metadata (NIP-57)
+      // Fallback: try resolving lightning address as a NIP-05 identifier.
+      let zapReceiptAuthor: string | null = null;
+      if (typeof payInfo.nostrPubkey === 'string' && /^[0-9a-f]{64}$/.test(payInfo.nostrPubkey)) {
+        zapReceiptAuthor = payInfo.nostrPubkey;
+      } else {
+        zapReceiptAuthor = await resolveNip05ToPubkey(lightningAddress);
+      }
 
       const minSendable = Math.ceil((payInfo.minSendable || 1000) / 1000);
       const maxSendable = Math.floor((payInfo.maxSendable || 1_000_000_000) / 1000);
@@ -281,6 +337,8 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       if (!pr) throw new Error('No invoice returned from service');
 
       setInvoice(pr);
+      setInvoiceCreatedAt(Math.floor(Date.now() / 1000));
+      setReceiptAuthorPubkey(zapReceiptAuthor);
 
       // Capture verify URL if available (LUD-21)
       if (invData.verify && typeof invData.verify === 'string') {
@@ -505,11 +563,18 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
 
             {/* Paid / Change buttons */}
             <div className="flex w-full items-center gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => { setInvoice(''); setQrCode(''); setVerifyUrl(null); stopPolling(); }}
-                className="text-[10px] font-black text-white/30 hover:text-white/60"
-              >
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setInvoice('');
+                setQrCode('');
+                setVerifyUrl(null);
+                setInvoiceCreatedAt(null);
+                setReceiptAuthorPubkey(null);
+                stopPolling();
+              }}
+              className="text-[10px] font-black text-white/30 hover:text-white/60"
+            >
                 CHANGE AMOUNT
               </Button>
               <div className="h-3 w-px bg-white/10" />
