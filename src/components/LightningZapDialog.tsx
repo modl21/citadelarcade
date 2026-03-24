@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Zap, Copy, Check, Loader2, ExternalLink, User } from 'lucide-react';
+import { Zap, Copy, Check, Loader2, ExternalLink, User, X } from 'lucide-react';
 import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,64 +30,73 @@ interface LightningZapDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Resolve npub/nprofile to hex pubkey. Returns null on invalid input. */
-function resolveNpub(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
+/** Resolve a NIP-05 identifier (name@domain) to a hex pubkey. */
+async function resolveNip05ToPubkey(nip05: string): Promise<string | null> {
+  const trimmed = nip05.trim().toLowerCase();
+  if (!trimmed.includes('@')) return null;
+
+  const [name, domain] = trimmed.split('@');
+  if (!name || !domain) return null;
 
   try {
-    // Handle both bare npub and nostr: URIs
-    const cleanValue = trimmed.startsWith('nostr:') ? trimmed.slice(6) : trimmed;
+    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
 
-    if (cleanValue.startsWith('npub1')) {
-      const decoded = nip19.decode(cleanValue);
-      if (decoded.type === 'npub') return decoded.data;
+    const data = await response.json();
+    const pubkey = data.names?.[name];
+
+    if (pubkey && /^[0-9a-f]{64}$/.test(pubkey)) {
+      return pubkey;
     }
-    if (cleanValue.startsWith('nprofile1')) {
-      const decoded = nip19.decode(cleanValue);
-      if (decoded.type === 'nprofile') return decoded.data.pubkey;
-    }
-    // Allow raw hex pubkey
-    if (/^[0-9a-f]{64}$/.test(cleanValue)) return cleanValue;
   } catch {
-    // invalid
+    // fail silently
   }
+
   return null;
 }
 
 /** Small inline profile preview. */
-function NpubPreview({ pubkey }: { pubkey: string }) {
+function NpubPreview({ pubkey, onClear }: { pubkey: string; onClear: () => void }) {
   const { data: author } = useAuthor(pubkey);
   const meta = author?.metadata;
   const npub = nip19.npubEncode(pubkey);
 
   return (
-    <a
-      href={`https://primal.net/p/${npub}`}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 transition-colors hover:bg-white/[0.06]"
-    >
-      <Avatar className="size-8 border border-white/10">
-        {meta?.picture ? (
-          <AvatarImage src={meta.picture} alt={meta.name ?? 'Profile'} />
-        ) : null}
-        <AvatarFallback className="bg-white/10 text-white/50 text-xs">
-          <User className="size-3.5" />
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white/90">
-          {meta?.display_name || meta?.name || npub.slice(0, 16) + '...'}
-        </p>
-        {meta?.nip05 && (
-          <p className="truncate text-[10px] text-white/40">{meta.nip05}</p>
-        )}
-      </div>
-      <div className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-500/70">
-        VERIFIED
-      </div>
-    </a>
+    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+      <a
+        href={`https://primal.net/p/${npub}`}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="flex min-w-0 flex-1 items-center gap-2.5 transition-colors hover:opacity-80"
+      >
+        <Avatar className="size-8 border border-white/10">
+          {meta?.picture ? (
+            <AvatarImage src={meta.picture} alt={meta.name ?? 'Profile'} />
+          ) : null}
+          <AvatarFallback className="bg-white/10 text-white/50 text-xs">
+            <User className="size-3.5" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-white/90">
+            {meta?.display_name || meta?.name || npub.slice(0, 16) + '...'}
+          </p>
+          {meta?.nip05 && (
+            <p className="truncate text-[10px] text-white/40">{meta.nip05}</p>
+          )}
+        </div>
+      </a>
+      <button
+        type="button"
+        onClick={onClear}
+        className="shrink-0 rounded-md p-1 text-white/30 transition-colors hover:bg-white/10 hover:text-white/60"
+        aria-label="Clear selected profile"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -98,7 +107,10 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
   const [selectedPreset, setSelectedPreset] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [npubInput, setNpubInput] = useState('');
+  const [nip05Input, setNip05Input] = useState('');
+  const [resolvedPubkey, setResolvedPubkey] = useState<string | null>(null);
+  const [isResolvingNip05, setIsResolvingNip05] = useState(false);
+  const [nip05Error, setNip05Error] = useState<string | null>(null);
   const [invoice, setInvoice] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -117,7 +129,33 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
     return selectedPreset;
   }, [customAmount, selectedPreset]);
 
-  const resolvedPubkey = useMemo(() => resolveNpub(npubInput), [npubInput]);
+  const handleLookupNip05 = useCallback(async () => {
+    const trimmed = nip05Input.trim();
+    if (!trimmed) return;
+
+    setNip05Error(null);
+    setIsResolvingNip05(true);
+    setResolvedPubkey(null);
+
+    try {
+      const pubkey = await resolveNip05ToPubkey(trimmed);
+      if (pubkey) {
+        setResolvedPubkey(pubkey);
+      } else {
+        setNip05Error('NOT FOUND — CHECK THE ADDRESS AND TRY AGAIN');
+      }
+    } catch {
+      setNip05Error('LOOKUP FAILED');
+    } finally {
+      setIsResolvingNip05(false);
+    }
+  }, [nip05Input]);
+
+  const handleClearNip05 = useCallback(() => {
+    setResolvedPubkey(null);
+    setNip05Input('');
+    setNip05Error(null);
+  }, []);
 
   // Stop polling helper
   const stopPolling = useCallback(() => {
@@ -140,7 +178,10 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
         setCustomAmount('');
         setSelectedPreset(1000);
         setMemo('');
-        setNpubInput('');
+        setNip05Input('');
+        setResolvedPubkey(null);
+        setIsResolvingNip05(false);
+        setNip05Error(null);
         setIsGenerating(false);
         setVerifyUrl(null);
         setIsPaid(false);
@@ -253,15 +294,13 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
       });
       setQrCode(qrDataUrl);
 
-      // Publish zap claim to Nostr if npub was provided
+      // Publish zap claim to Nostr if NIP-05 was resolved
       if (resolvedPubkey) {
         try {
           await publishZapClaim(nostr, resolvedPubkey, lightningAddress, amount);
-          // Invalidate the zap claims query so the leaderboard shows it
           queryClient.invalidateQueries({ queryKey: ['zap-claims', lightningAddress] });
         } catch (claimErr) {
           console.warn('Failed to publish zap claim:', claimErr);
-          // Non-fatal — invoice was already generated
         }
       }
     } catch (err) {
@@ -329,27 +368,41 @@ export function LightningZapDialog({ lightningAddress, open, onOpenChange }: Lig
               />
             </div>
 
-            {/* Npub input for social credit */}
+            {/* NIP-05 input for social credit */}
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-white/30">
-                YOUR NPUB <span className="text-white/15 normal-case">(optional — get social credit)</span>
+                YOUR NOSTR USERNAME <span className="text-white/15 normal-case">(optional — get social credit)</span>
               </Label>
-              <Input
-                placeholder="npub1..."
-                value={npubInput}
-                onChange={(e) => setNpubInput(e.target.value)}
-                className="h-10 border-white/5 bg-white/5 font-mono text-sm tracking-widest text-white placeholder:text-white/20"
-              />
-              {/* Profile preview */}
-              {resolvedPubkey && (
-                <div className="animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                  <NpubPreview pubkey={resolvedPubkey} />
+
+              {resolvedPubkey ? (
+                <NpubPreview pubkey={resolvedPubkey} onClear={handleClearNip05} />
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="odell@primal.net"
+                    value={nip05Input}
+                    onChange={(e) => { setNip05Input(e.target.value); setNip05Error(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleLookupNip05();
+                      }
+                    }}
+                    className="h-10 flex-1 border-white/5 bg-white/5 text-sm text-white placeholder:text-white/20"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleLookupNip05}
+                    disabled={isResolvingNip05 || !nip05Input.trim()}
+                    className="h-10 shrink-0 bg-white/10 px-3 text-[10px] font-black text-white/70 hover:bg-white/20 disabled:opacity-30"
+                  >
+                    {isResolvingNip05 ? <Loader2 className="size-3.5 animate-spin" /> : 'LOOKUP'}
+                  </Button>
                 </div>
               )}
-              {npubInput.trim() && !resolvedPubkey && (
-                <p className="text-[10px] font-bold text-red-400/80 uppercase">
-                  INVALID NPUB — ENTER A VALID npub1... ADDRESS
-                </p>
+
+              {nip05Error && (
+                <p className="text-[10px] font-bold text-red-400/80 uppercase">{nip05Error}</p>
               )}
             </div>
 
